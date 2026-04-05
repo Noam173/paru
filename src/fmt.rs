@@ -290,10 +290,7 @@ fn repo<'a>(config: &'a Config, pkg: &str) -> &'a str {
         return "aur";
     }
 
-    
-
-    (dbs
-        .iter()
+    (dbs.iter()
         .find(|db| db.pkg(pkg).is_ok())
         .map(|db| db.name())
         .unwrap_or_else(|| dbs.first().unwrap().name())) as _
