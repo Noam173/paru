@@ -1,41 +1,29 @@
-FROM debian:13 AS build-stage
+FROM archlinux:base-devel AS build-stage
 
-ARG PACMAN_HASH=b9f7d4a5b0bea75953f5892621a2caecc5672de5
-ARG PACMAN_VER=7.1.0
-ARG DEBIAN_FRONTEND=noninteractive
+ARG DIR=/paru
+ARG RUST_VER=nightly
 
-WORKDIR /pacman
+RUN pacman -Syu --noconfirm
 
-RUN apt-get update -y
-RUN apt-get install -y build-essential git libcurl4-openssl-dev curl meson ninja-build \
-        libarchive-dev pkg-config libgpgme-dev libssl-dev clang python3 python3-setuptools \
-        gettext zstd
+RUN pacman -S rustup sudo --noconfirm
 
-RUN curl -L -o pacman-${PACMAN_VER}.tar.xz https://gitlab.archlinux.org/pacman/pacman/-/archive/${PACMAN_HASH}/pacman-${PACMAN_HASH}.tar.gz
-RUN tar -xf pacman-${PACMAN_VER}.tar.xz
+RUN echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-WORKDIR pacman-${PACMAN_HASH}
+RUN useradd -m user
 
-RUN meson setup \
-        --prefix=/usr \
-        --buildtype=plain \
-        build
+RUN usermod -aG wheel user
 
-RUN ninja -C build
-RUN ninja -C build install
+WORKDIR ${DIR}
 
-WORKDIR /paru
+COPY . .
 
-ENV RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
+RUN chown -R user:user ${DIR}
 
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-     sh -s -- -y --no-modify-path --profile minimal --default-toolchain nightly
+USER user
 
-COPY ../ .
+RUN rustup default ${RUST_VER}
 
-RUN --mount=type=tmpfs,target=/usr/local/cargo/git ./scripts/dist
+RUN cargo build --release
 
 FROM scratch AS export-stage
-COPY --from=build-stage /paru/paru.tar.zst /
+COPY --from=build-stage /paru/target/release/paru /
