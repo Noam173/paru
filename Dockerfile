@@ -23,7 +23,10 @@ USER user
 
 RUN rustup default ${RUST_VER}
 
+RUN cargo update && cargo clippy && cargo fmt
+
 RUN cargo build --release
 
 FROM scratch AS export-stage
-COPY --from=build-stage /paru/target/release/paru /
+COPY --from=build-stage /paru/target/release/paru /paru
+# podman/docker build . -t paru -o .
